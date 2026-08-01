@@ -1,128 +1,124 @@
+import csv
 import random
 
-GRID_SIZE = 5
-dirt = {(0, 2), (2, 2), (4, 4), (3, 1)}
-obstacles = {(1, 1), (2, 3), (4, 2)}
-actions = {
-    "UP": (-1, 0),
-    "DOWN": (1, 0),
-    "LEFT": (0, -1),
-    "RIGHT": (0, 1)
-}
+filename = input("Enter CSV file name (Example: grid.csv): ")
 
-class GridMDP:
-    def __init__(self):
-        self.reset()
+grid = []
 
-    def reset(self):
-        self.position = (0, 0)
-        self.cleaned = set()
-        return self.position
+with open(filename, "r") as file:
+    reader = csv.reader(file)
+    for row in reader:
+        grid.append([cell.strip() for cell in row])
 
-    def step(self, action):
-        x, y = self.position
-        dx, dy = actions[action]
+ROWS = len(grid)
+COLS = len(grid[0])
 
-        nx = max(0, min(GRID_SIZE - 1, x + dx))
-        ny = max(0, min(GRID_SIZE - 1, y + dy))
+print("\nGrid Loaded Successfully:\n")
 
-        self.position = (nx, ny)
+for row in grid:
+    print(" ".join(row))
 
-        reward = 0
 
-        if self.position in obstacles:
-            reward = -1
+start = (0, 0)
 
-        elif self.position in dirt and self.position not in self.cleaned:
-            reward = 1
-            self.cleaned.add(self.position)
+for i in range(ROWS):
+    for j in range(COLS):
+        if grid[i][j] == 'S':
+            start = (i, j)
+            
+UP = (-1, 0)
+DOWN = (1, 0)
+LEFT = (0, -1)
+RIGHT = (0, 1)
 
-        done = len(self.cleaned) == len(dirt)
+actions = [UP, DOWN, LEFT, RIGHT]
 
-        return self.position, reward, done
+DIRT_REWARD = 1
+OBSTACLE_PENALTY = -1
+STEP_COST = -0.05
 
-    def display(self):
-        print("\nGrid:")
-        for i in range(GRID_SIZE):
-            row = ""
-            for j in range(GRID_SIZE):
-                cell = (i, j)
+def valid(x, y):
+    return 0 <= x < ROWS and 0 <= y < COLS
 
-                if cell == self.position:
-                    row += " R "
-                elif cell in obstacles:
-                    row += " X "
-                elif cell in dirt and cell not in self.cleaned:
-                    row += " D "
-                else:
-                    row += " . "
-            print(row)
-        print()
+def move(state, action):
+    x, y = state
+    dx, dy = action
+
+    nx = x + dx
+    ny = y + dy
+
+    if not valid(nx, ny):
+        return state, STEP_COST
+
+    if grid[nx][ny] == '#':
+        return state, OBSTACLE_PENALTY
+
+    reward = STEP_COST
+
+    if grid[nx][ny] == 'D':
+        reward += DIRT_REWARD
+        grid[nx][ny] = '.'
+
+    return (nx, ny), reward
+
 
 def random_policy():
-    return random.choice(list(actions.keys()))
+    return random.choice(actions)
 
 
-def greedy_policy(env):
-    if len(env.cleaned) == len(dirt):
-        return random_policy()
+def greedy_policy(state):
+    x, y = state
 
-    current = env.position
+    for dx, dy in actions:
+        nx = x + dx
+        ny = y + dy
 
-    remaining = [d for d in dirt if d not in env.cleaned]
+        if valid(nx, ny):
+            if grid[nx][ny] == 'D':
+                return (dx, dy)
 
-    target = min(
-        remaining,
-        key=lambda x: abs(x[0]-current[0]) + abs(x[1]-current[1])
-    )
+    return random.choice(actions)
 
-    tx, ty = target
-    x, y = current
+print("\nSelect Policy")
+print("1. Random Policy")
+print("2. Greedy Policy")
 
-    if tx > x:
-        return "DOWN"
-    elif tx < x:
-        return "UP"
-    elif ty > y:
-        return "RIGHT"
-    elif ty < y:
-        return "LEFT"
+choice = int(input("Enter your choice: "))
 
-    return random_policy()
+if choice == 1:
+    policy = "Random"
+else:
+    policy = "Greedy"
 
-def simulate(policy_name, max_steps=50):
-    env = GridMDP()
-    total_reward = 0
+state = start
+total_reward = 0
 
-    print("\n==============================")
-    print("Policy:", policy_name)
-    print("==============================")
+print("\nRobot Started at:", state)
 
-    env.display()
+for step in range(100):
 
-    for step in range(max_steps):
+    if policy == "Random":
+        action = random_policy()
+    else:
+        action = greedy_policy(state)
 
-        if policy_name == "Random":
-            action = random_policy()
-        else:
-            action = greedy_policy(env)
+    state, reward = move(state, action)
+    total_reward += reward
 
-        state, reward, done = env.step(action)
+    print("Step:", step + 1,
+          "Position:", state,
+          "Reward:", reward)
 
-        total_reward += reward
+    dirt_left = False
 
-        print(f"Step {step+1}")
-        print("Action:", action)
-        print("State :", state)
-        print("Reward:", reward)
-        print()
-        env.display()
-
-        if done:
-            print("All dirt cleaned!")
+    for row in grid:
+        if 'D' in row:
+            dirt_left = True
             break
 
-    print("Total Reward =", total_reward)
+    if not dirt_left:
+        print("\nAll dirt cleaned!")
+        break
 
-simulate("Random")
-simulate("Greedy")
+print("\nFinal Position :", state)
+print("Total Reward   :", total_reward)
