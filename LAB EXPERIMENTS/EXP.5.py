@@ -1,113 +1,125 @@
+from google.colab import files
+import pandas as pd
 import numpy as np
-
-grid = [
-    ['S', 'S', 'S', 'P'],
-    ['S', 'X', 'S', 'S'],
-    ['S', 'S', 'S', 'S'],
-    ['S', 'S', 'S', 'G']
-]
-
-ROWS = len(grid)
-COLS = len(grid[0])
-
-# Actions
-UP = 0
-DOWN = 1
-LEFT = 2
-RIGHT = 3
-
-actions = [UP, DOWN, LEFT, RIGHT]
-symbols = ['↑', '↓', '←', '→']
-
-gamma = 0.9
-theta = 0.001
-
-# Initialize Value Function and Policy
-V = np.zeros((ROWS, COLS))
-policy = np.zeros((ROWS, COLS), dtype=int)
-
-def next_state(i, j, action):
-
-    ni, nj = i, j
-
-    if action == UP:
-        ni -= 1
-    elif action == DOWN:
-        ni += 1
-    elif action == LEFT:
-        nj -= 1
-    elif action == RIGHT:
-        nj += 1
-
-    # Boundary check
-    if ni < 0 or ni >= ROWS or nj < 0 or nj >= COLS:
-        return i, j
-
-    # Obstacle check
-    if grid[ni][nj] == 'X':
-        return i, j
-
-    return ni, nj
-
-def reward(i, j):
-
-    if grid[i][j] == 'P':
+ROWS=5
+COLS=5
+ACTIONS=[(-1,0),(1,0),(0,-1),(0,1)]
+GAMMA=0.9
+THETA=0.0001
+PICKUP=(4,4)
+TRAFFIC=set()
+HOTSPOTS=set()
+def upload_csv():
+    f=files.upload()
+    return list(f.keys())[0]
+def load_csv(file):
+    global PICKUP,TRAFFIC,HOTSPOTS
+    TRAFFIC.clear()
+    HOTSPOTS.clear()
+    data=pd.read_csv(file)
+    for _,r in data.iterrows():
+        p=(int(r["Row"]),int(r["Column"]))
+        t=str(r["Type"]).upper()
+        if t=="PICKUP":
+            PICKUP=p
+        elif t=="TRAFFIC":
+            TRAFFIC.add(p)
+        elif t=="HOTSPOT":
+            HOTSPOTS.add(p)
+def valid(s):
+    return 0<=s[0]<ROWS and 0<=s[1]<COLS
+def move(s,a):
+    ns=(s[0]+a[0],s[1]+a[1])
+    if valid(ns):
+        return ns
+    return s
+def reward(s):
+    if s==PICKUP:
         return 10
-    elif grid[i][j] == 'G':
-        return 20
-    else:
-        return -1
-
-
+    if s in HOTSPOTS:
+        return 3
+    if s in TRAFFIC:
+        return -5
+    return -1
+def value_iteration():
+    V=np.zeros((ROWS,COLS))
+    while True:
+        delta=0
+        NV=V.copy()
+        for r in range(ROWS):
+            for c in range(COLS):
+                s=(r,c)
+                if s==PICKUP or s in TRAFFIC:
+                    continue
+                best=-99999
+                for a in ACTIONS:
+                    ns=move(s,a)
+                    val=reward(ns)+GAMMA*V[ns]
+                    if val>best:
+                        best=val
+                NV[r,c]=best
+                delta=max(delta,abs(NV[r,c]-V[r,c]))
+        V=NV
+        if delta<THETA:
+            break
+    policy=np.full((ROWS,COLS)," ",dtype=object)
+    d={0:"↑",1:"↓",2:"←",3:"→"}
+    for r in range(ROWS):
+        for c in range(COLS):
+            s=(r,c)
+            if s==PICKUP:
+                policy[r,c]="P"
+            elif s in TRAFFIC:
+                policy[r,c]="X"
+            else:
+                best=-99999
+                act=0
+                for i,a in enumerate(ACTIONS):
+                    ns=move(s,a)
+                    val=reward(ns)+GAMMA*V[ns]
+                    if val>best:
+                        best=val
+                        act=i
+                policy[r,c]=d[act]
+    return V,policy
+def show():
+    print("\nTaxi Dispatch Grid\n")
+    for r in range(ROWS):
+        for c in range(COLS):
+            p=(r,c)
+            if p==PICKUP:
+                print("P",end=" ")
+            elif p in TRAFFIC:
+                print("X",end=" ")
+            elif p in HOTSPOTS:
+                print("H",end=" ")
+            else:
+                print(".",end=" ")
+        print()
 while True:
-
-    delta = 0
-    newV = V.copy()
-
-    for i in range(ROWS):
-        for j in range(COLS):
-
-            if grid[i][j] == 'X':
-                continue
-
-            best_value = -9999
-            best_action = 0
-
-            for action in actions:
-
-                ni, nj = next_state(i, j, action)
-
-                value = reward(ni, nj) + gamma * V[ni][nj]
-
-                if value > best_value:
-                    best_value = value
-                    best_action = action
-
-            newV[i][j] = best_value
-            policy[i][j] = best_action
-
-            delta = max(delta, abs(newV[i][j] - V[i][j]))
-
-    V = newV
-
-    if delta < theta:
+    print("\n====== Taxi Dispatch Value Iteration ======")
+    print("1.Upload CSV")
+    print("2.Show Grid")
+    print("3.Run Value Iteration")
+    print("4.Exit")
+    ch=input("Enter Choice: ")
+    if ch=="1":
+        file=upload_csv()
+        load_csv(file)
+        print("CSV Uploaded Successfully")
+    elif ch=="2":
+        show()
+    elif ch=="3":
+        V,P=value_iteration()
+        print("\nOptimal Value Function\n")
+        print(np.round(V,2))
+        print("\nOptimal Policy\n")
+        print(P)
+        pd.DataFrame(np.round(V,2)).to_csv("value_iteration_output.csv",index=False)
+        print("\nOutput CSV Generated")
+        files.download("value_iteration_output.csv")
+    elif ch=="4":
         break
+    else:
+        print("Invalid Choice")
 
-print("Optimal Dispatch Policy\n")
-
-for i in range(ROWS):
-    for j in range(COLS):
-
-        if grid[i][j] == 'X':
-            print(" # ", end=" ")
-
-        elif grid[i][j] == 'P':
-            print(" P ", end=" ")
-
-        elif grid[i][j] == 'G':
-            print(" G ", end=" ")
-
-        else:
-            print(symbols[policy[i][j]], end="  ")
-
-    print()
