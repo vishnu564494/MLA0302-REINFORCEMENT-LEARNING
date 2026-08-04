@@ -1,61 +1,90 @@
-import random
+from google.colab import files
+import pandas as pd
 import numpy as np
-states = ["Normal", "Priority", "VIP"]
-
-# Rewards
-rewards = {
-    "Normal": 2,
-    "Priority": 5,
-    "VIP": 8
-}
-
-# Number of Episodes
-episodes = 1000
-
+import matplotlib.pyplot as plt
+CALLS=[]
+EPISODES=500
+def upload_csv():
+    f=files.upload()
+    return list(f.keys())[0]
+def load_csv(file):
+    global CALLS
+    CALLS=pd.read_csv(file)
 def random_policy():
-    return random.choice(states)
-
-
-def priority_policy():
-
-    r = random.random()
-
-    if r < 0.6:
-        return "Priority"
-    elif r < 0.9:
-        return "VIP"
+    rewards=[]
+    for _ in range(EPISODES):
+        total=0
+        for _,r in CALLS.iterrows():
+            rep=np.random.randint(1,4)
+            if rep==r["BestRep"]:
+                total+=10
+            else:
+                total-=2
+        rewards.append(total)
+    return np.mean(rewards)
+def greedy_policy():
+    rewards=[]
+    for _ in range(EPISODES):
+        total=0
+        for _,r in CALLS.iterrows():
+            rep=r["BestRep"]
+            if rep==r["BestRep"]:
+                total+=10
+            else:
+                total-=2
+        rewards.append(total)
+    return np.mean(rewards)
+def epsilon_policy():
+    rewards=[]
+    e=0.2
+    for _ in range(EPISODES):
+        total=0
+        for _,r in CALLS.iterrows():
+            if np.random.rand()<e:
+                rep=np.random.randint(1,4)
+            else:
+                rep=r["BestRep"]
+            if rep==r["BestRep"]:
+                total+=10
+            else:
+                total-=2
+        rewards.append(total)
+    return np.mean(rewards)
+def graph(v):
+    names=["Random","Greedy","Epsilon-Greedy"]
+    plt.figure(figsize=(6,4))
+    plt.bar(names,v,color=["red","green","blue"])
+    plt.ylabel("Average Reward")
+    plt.title("Policy Comparison")
+    plt.grid(axis="y")
+    plt.show()
+while True:
+    print("\n====== Call Center Monte Carlo ======")
+    print("1.Upload CSV")
+    print("2.Run Monte Carlo Simulation")
+    print("3.Exit")
+    ch=input("Enter Choice: ")
+    if ch=="1":
+        file=upload_csv()
+        load_csv(file)
+        print("CSV Uploaded Successfully")
+        print("Total Calls :",len(CALLS))
+    elif ch=="2":
+        r=random_policy()
+        g=greedy_policy()
+        e=epsilon_policy()
+        print("\nEstimated State Value Function")
+        print("-------------------------------")
+        print("Random Policy         :",round(r,2))
+        print("Greedy Policy         :",round(g,2))
+        print("Epsilon-Greedy Policy :",round(e,2))
+        values=[r,g,e]
+        best=np.argmax(values)
+        print("\nBest Policy :",["Random","Greedy","Epsilon-Greedy"][best])
+        graph(values)
+    elif ch=="3":
+        break
     else:
-        return "Normal"
-
-def monte_carlo(policy):
-
-    returns = {s: [] for s in states}
-
-    for episode in range(episodes):
-
-        state = policy()
-
-        reward = rewards[state]
-
-        returns[state].append(reward)
-
-    value = {}
-
-    for s in states:
-        value[s] = np.mean(returns[s])
-
-    return value
-
-random_values = monte_carlo(random_policy)
-priority_values = monte_carlo(priority_policy)
+        print("Invalid Choice")
 
 
-print("Estimated Value Function\n")
-
-print("Random Policy")
-for s in states:
-    print(s, ":", round(random_values[s],2))
-
-print("\nPriority Policy")
-for s in states:
-    print(s, ":", round(priority_values[s],2))
