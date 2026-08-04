@@ -1,171 +1,99 @@
+from google.colab import files
+import pandas as pd
 import numpy as np
-import random
+import matplotlib.pyplot as plt
 from collections import deque
+import random
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers import Adam
-
-class StockTradingEnv:
-
-    def __init__(self, prices):
-        self.prices = prices
-        self.reset()
-
-    def reset(self):
-        self.current_step = 0
-        self.inventory = []
-        self.total_profit = 0
-        return np.array([self.prices[self.current_step]])
-
-    def step(self, action):
-
-        reward = 0
-
-        price = self.prices[self.current_step]
-
-        # Buy
-        if action == 0:
-            self.inventory.append(price)
-
-        # Sell
-        elif action == 1 and len(self.inventory) > 0:
-            buy_price = self.inventory.pop(0)
-            reward = price - buy_price
-            self.total_profit += reward
-
-        # Hold -> reward = 0
-
-        self.current_step += 1
-
-        done = self.current_step == len(self.prices) - 1
-
-        next_state = np.array([self.prices[self.current_step]])
-
-        return next_state, reward, done
-
-class DoubleDQN:
-
-    def __init__(self):
-
-        self.state_size = 1
-        self.action_size = 3
-
-        self.gamma = 0.95
-        self.epsilon = 1.0
-        self.epsilon_decay = 0.995
-        self.epsilon_min = 0.01
-
-        self.memory = deque(maxlen=2000)
-
-        self.model = self.build_network()
-        self.target_model = self.build_network()
-
-        self.update_target()
-
-    def build_network(self):
-
-        model = Sequential()
-
-        model.add(Dense(24, activation="relu", input_shape=(1,)))
-        model.add(Dense(24, activation="relu"))
-        model.add(Dense(3, activation="linear"))
-
-        model.compile(loss="mse",
-                      optimizer=Adam(learning_rate=0.001))
-
-        return model
-
-    def update_target(self):
-        self.target_model.set_weights(
-            self.model.get_weights())
-
-    def remember(self, state, action, reward, next_state, done):
-        self.memory.append(
-            (state, action, reward, next_state, done))
-
-    def act(self, state):
-
-        if random.random() < self.epsilon:
-            return random.randint(0,2)
-
-        q = self.model.predict(
-            state.reshape(1,1),
-            verbose=0)
-
-        return np.argmax(q[0])
-
-    def replay(self, batch_size):
-
-        batch = random.sample(self.memory, batch_size)
-
-        for state, action, reward, next_state, done in batch:
-
-            target = reward
-
-            if not done:
-
-                # Double DQN
-                best_action = np.argmax(
-                    self.model.predict(
-                        next_state.reshape(1,1),
-                        verbose=0)[0])
-
-                target = reward + self.gamma * \
-                    self.target_model.predict(
-                        next_state.reshape(1,1),
-                        verbose=0)[0][best_action]
-
-            target_f = self.model.predict(
-                state.reshape(1,1),
-                verbose=0)
-
-            target_f[0][action] = target
-
-            self.model.fit(
-                state.reshape(1,1),
-                target_f,
-                epochs=1,
-                verbose=0)
-
-        if self.epsilon > self.epsilon_min:
-            self.epsilon *= self.epsilon_decay
-
-prices = [100,102,101,105,107,110,108,112,
-          115,117,116,120,122,121,125]
-
-env = StockTradingEnv(prices)
-
-agent = DoubleDQN()
-
-episodes = 20
-batch_size = 8
-
-for episode in range(episodes):
-
-    state = env.reset()
-
-    while True:
-
-        action = agent.act(state)
-
-        next_state, reward, done = env.step(action)
-
-        agent.remember(
-            state,
-            action,
-            reward,
-            next_state,
-            done)
-
-        state = next_state
-
-        if len(agent.memory) >= batch_size:
-            agent.replay(batch_size)
-
-        if done:
-            agent.update_target()
-            print("Episode:", episode + 1,
-                  "Profit:", env.total_profit)
-            break
-
-print("\nTraining Completed")
+DATA=None
+EPISODES=30
+GAMMA=0.95
+EPSILON=1.0
+EPSILON_MIN=0.01
+EPSILON_DECAY=0.95
+LR=0.001
+MEMORY=deque(maxlen=500)
+def upload_csv():
+    f=files.upload()
+    return list(f.keys())[0]
+def load_csv(file):
+    global DATA
+    DATA=pd.read_csv(file)
+def model():
+    m=Sequential()
+    m.add(Dense(24,input_dim=1,activation="relu"))
+    m.add(Dense(24,activation="relu"))
+    m.add(Dense(3,activation="linear"))
+    m.compile(loss="mse",optimizer=Adam(learning_rate=LR))
+    return m
+def train():
+    global EPSILON
+    online=model()
+    target=model()
+    target.set_weights(online.get_weights())
+    rewards=[]
+    for ep in range(EPISODES):
+        profit=0
+        buy=0
+        for i in range(len(DATA)-1):
+            state=np.array([[DATA["Close"][i]]],dtype=float)
+            if np.random.rand()<EPSILON:
+                action=np.random.randint(3)
+            else:
+                action=np.argmax(online.predict(state,verbose=0)[0])
+            price=DATA["Close"][i]
+            next_price=DATA["Close"][i+1]
+            reward=0
+            if action==0:
+                buy=price
+            elif action==1 and buy!=0:
+                reward=next_price-buy
+                profit+=reward
+                buy=0
+            next_state=np.array([[next_price]],dtype=float)
+            MEMORY.append((state,action,reward,next_state))
+            if len(MEMORY)>32:
+                batch=random.sample(MEMORY,32)
+                for s,a,r,ns in batch:
+                    q=online.predict(s,verbose=0)
+                    na=np.argmax(online.predict(ns,verbose=0)[0])
+                    tq=target.predict(ns,verbose=0)[0][na]
+                    q[0][a]=r+GAMMA*tq
+                    online.fit(s,q,epochs=1,verbose=0)
+        target.set_weights(online.get_weights())
+        if EPSILON>EPSILON_MIN:
+            EPSILON*=EPSILON_DECAY
+        rewards.append(profit)
+    return rewards
+def graph(r):
+    plt.figure(figsize=(7,4))
+    plt.plot(r,linewidth=2)
+    plt.xlabel("Episode")
+    plt.ylabel("Profit")
+    plt.title("Double DQN Training")
+    plt.grid(True)
+    plt.show()
+while True:
+    print("\n====== Double DQN Stock Trading ======")
+    print("1.Upload CSV")
+    print("2.Train Agent")
+    print("3.Exit")
+    ch=input("Enter Choice: ")
+    if ch=="1":
+        file=upload_csv()
+        load_csv(file)
+        print("CSV Uploaded Successfully")
+        print("Records :",len(DATA))
+    elif ch=="2":
+        rewards=train()
+        print("\nTraining Completed")
+        print("Maximum Profit :",round(max(rewards),2))
+        print("Average Profit :",round(np.mean(rewards),2))
+        print("Final Episode Profit :",round(rewards[-1],2))
+        graph(rewards)
+    elif ch=="3":
+        break
+    else:
+        print("Invalid Choice")
