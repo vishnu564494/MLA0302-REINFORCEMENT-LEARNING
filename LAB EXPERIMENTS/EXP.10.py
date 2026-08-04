@@ -1,38 +1,62 @@
+from google.colab import files
+import pandas as pd
 import numpy as np
-actions = ["Buy", "Hold", "Sell"]
-
-# Rewards for each action
-rewards = [5, 2, -2]
-
-# Initial Policy Probabilities
-policy = np.array([0.33, 0.34, 0.33])
-
-learning_rate = 0.05
-episodes = 100
-
-print("Initial Policy:", np.round(policy, 2))
-
-for episode in range(episodes):
-
-    # Choose action according to policy
-    action = np.random.choice(3, p=policy)
-
-    reward = rewards[action]
-
-    # Policy Gradient Update
-    policy[action] += learning_rate * reward
-
-    # Keep probabilities positive
-    policy = np.clip(policy, 0.01, None)
-
-    # Normalize probabilities
-    policy = policy / np.sum(policy)
-
-print("\nFinal Policy Probabilities")
-
-for i in range(3):
-    print(actions[i], ":", round(policy[i], 3))
-
-best_action = actions[np.argmax(policy)]
-
-print("\nBest Investment Strategy:", best_action)
+import matplotlib.pyplot as plt
+DATA=None
+EPISODES=100
+LR=0.05
+def upload_csv():
+    f=files.upload()
+    return list(f.keys())[0]
+def load_csv(file):
+    global DATA
+    DATA=pd.read_csv(file)
+def sigmoid(x):
+    return 1/(1+np.exp(-x))
+def policy_gradient():
+    theta=0.0
+    rewards=[]
+    probs=[]
+    for ep in range(EPISODES):
+        total=0
+        p=sigmoid(theta)
+        for _,r in DATA.iterrows():
+            action=1 if np.random.rand()<p else 0
+            ret=r["Return"]
+            reward=ret if action==1 else 0
+            total+=reward
+            grad=(action-p)*reward
+            theta+=LR*grad
+        rewards.append(total)
+        probs.append(sigmoid(theta))
+    return rewards,probs
+def graph(rewards):
+    plt.figure(figsize=(7,4))
+    plt.plot(rewards,linewidth=2)
+    plt.title("Policy Gradient Learning")
+    plt.xlabel("Episode")
+    plt.ylabel("Total Reward")
+    plt.grid(True)
+    plt.show()
+while True:
+    print("\n====== Investment Policy Gradient ======")
+    print("1.Upload CSV")
+    print("2.Run Policy Gradient")
+    print("3.Exit")
+    ch=input("Enter Choice: ")
+    if ch=="1":
+        file=upload_csv()
+        load_csv(file)
+        print("CSV Uploaded Successfully")
+        print("Total Records :",len(DATA))
+    elif ch=="2":
+        rewards,probs=policy_gradient()
+        print("\nFinal Policy Probability :",round(probs[-1],4))
+        print("Maximum Return :",round(max(rewards),2))
+        print("Average Return :",round(np.mean(rewards),2))
+        print("Minimum Return :",round(min(rewards),2))
+        graph(rewards)
+    elif ch=="3":
+        break
+    else:
+        print("Invalid Choice")
