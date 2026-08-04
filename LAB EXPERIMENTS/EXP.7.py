@@ -1,99 +1,104 @@
+from google.colab import files
+import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-grid = [
-    ['S', 'S', 'S', 'S'],
-    ['S', '#', 'S', 'S'],
-    ['S', 'S', 'S', 'G'],
-    ['S', 'S', 'S', 'S']
-]
-
-ROWS = len(grid)
-COLS = len(grid[0])
-
-gamma = 0.9
-theta = 0.001
-
-# Actions
-RIGHT = 0
-DOWN = 1
-
-def reward(i, j):
-    if grid[i][j] == 'G':
+ROWS=5
+COLS=5
+GAMMA=0.9
+THETA=0.0001
+GOALS=set()
+OBSTACLES=set()
+ACTIONS=[(-1,0),(1,0),(0,-1),(0,1)]
+def upload_csv():
+    f=files.upload()
+    return list(f.keys())[0]
+def load_csv(file):
+    global GOALS,OBSTACLES
+    GOALS.clear()
+    OBSTACLES.clear()
+    data=pd.read_csv(file)
+    for _,r in data.iterrows():
+        p=(int(r["Row"]),int(r["Column"]))
+        t=str(r["Type"]).upper()
+        if t=="GOAL":
+            GOALS.add(p)
+        elif t=="OBSTACLE":
+            OBSTACLES.add(p)
+def valid(s):
+    return 0<=s[0]<ROWS and 0<=s[1]<COLS
+def move(s,a):
+    ns=(s[0]+a[0],s[1]+a[1])
+    if valid(ns):
+        return ns
+    return s
+def reward(s):
+    if s in GOALS:
         return 10
-    elif grid[i][j] == '#':
+    if s in OBSTACLES:
         return -5
-    else:
-        return -1
-
-
-def next_state(i, j, action):
-
-    ni, nj = i, j
-
-    if action == RIGHT:
-        nj += 1
-    elif action == DOWN:
-        ni += 1
-
-    # Boundary check
-    if ni < 0 or ni >= ROWS or nj < 0 or nj >= COLS:
-        return i, j
-
-    # Obstacle
-    if grid[ni][nj] == '#':
-        return i, j
-
-    return ni, nj
-
-def value_function(policy):
-
-    V = np.zeros((ROWS, COLS))
-
+    return -1
+def value_function():
+    V=np.zeros((ROWS,COLS))
     while True:
-
-        delta = 0
-
-        newV = V.copy()
-
-        for i in range(ROWS):
-            for j in range(COLS):
-
-                if grid[i][j] == '#':
+        delta=0
+        NV=V.copy()
+        for r in range(ROWS):
+            for c in range(COLS):
+                s=(r,c)
+                if s in GOALS or s in OBSTACLES:
                     continue
-
-                ni, nj = next_state(i, j, policy)
-
-                newV[i][j] = reward(ni, nj) + gamma * V[ni][nj]
-
-                delta = max(delta, abs(newV[i][j] - V[i][j]))
-
-        V = newV
-
-        if delta < theta:
+                values=[]
+                for a in ACTIONS:
+                    ns=move(s,a)
+                    values.append(reward(ns)+GAMMA*V[ns])
+                NV[r,c]=max(values)
+                delta=max(delta,abs(NV[r,c]-V[r,c]))
+        V=NV
+        if delta<THETA:
             break
-
     return V
-
-
-right_policy = value_function(RIGHT)
-down_policy = value_function(DOWN)
-
-print("Value Function - Right Policy")
-print(np.round(right_policy,2))
-
-print("\nValue Function - Down Policy")
-print(np.round(down_policy,2))
-
-plt.figure(figsize=(10,4))
-
-plt.subplot(1,2,1)
-plt.imshow(right_policy, cmap='viridis')
-plt.title("Right Policy")
-plt.colorbar()
-
-plt.subplot(1,2,2)
-plt.imshow(down_policy, cmap='viridis')
-plt.title("Down Policy")
-plt.colorbar()
-
-plt.show()
+def show():
+    print("\nWarehouse Grid\n")
+    for r in range(ROWS):
+        for c in range(COLS):
+            p=(r,c)
+            if p in GOALS:
+                print("G",end=" ")
+            elif p in OBSTACLES:
+                print("X",end=" ")
+            else:
+                print(".",end=" ")
+        print()
+def visualize(V):
+    plt.figure(figsize=(6,5))
+    plt.imshow(V,cmap="viridis")
+    plt.colorbar(label="State Value")
+    plt.xticks(range(COLS))
+    plt.yticks(range(ROWS))
+    plt.title("State Value Function")
+    for i in range(ROWS):
+        for j in range(COLS):
+            plt.text(j,i,round(V[i,j],1),ha="center",va="center",color="white")
+    plt.show()
+while True:
+    print("\n===== Delivery Robot Bellman Equation =====")
+    print("1.Upload CSV")
+    print("2.Show Warehouse")
+    print("3.Compute State Value Function")
+    print("4.Exit")
+    ch=input("Enter Choice: ")
+    if ch=="1":
+        file=upload_csv()
+        load_csv(file)
+        print("CSV Uploaded Successfully")
+    elif ch=="2":
+        show()
+    elif ch=="3":
+        V=value_function()
+        print("\nState Value Function\n")
+        print(np.round(V,2))
+        visualize(V)
+    elif ch=="4":
+        break
+    else:
+        print("Invalid Choice")
