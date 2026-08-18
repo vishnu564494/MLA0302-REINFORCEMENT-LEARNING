@@ -1,0 +1,307 @@
+# urban environment. Implement a sampling-based planning algorithm (e.g., RRT, RRT*,
+# or PRM) to plan collision-free flight paths for the UAV while maximizing coverage and
+# minimizing detection latency. Write a Python program to simulate the UAV&#39;s surveillance
+# mission and visualize the planned paths.
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+import random
+import math
+import csv
+import tkinter as tk
+from tkinter import filedialog
+
+# -----------------------------
+# Upload / Select CSV file
+# -----------------------------
+root = tk.Tk()
+root.withdraw()
+
+file_path = filedialog.askopenfilename(
+    title="Select Buildings CSV File",
+    filetypes=[("CSV Files", "*.csv")]
+)
+
+if not file_path:
+    print("No file selected!")
+    exit()
+
+print("File selected:", file_path)
+
+# -----------------------------
+# Read CSV
+# -----------------------------
+buildings = []
+
+with open(file_path, "r") as file:
+    data = csv.DictReader(file)
+
+    for row in data:
+        buildings.append((
+            float(row["x"]),
+            float(row["y"]),
+            float(row["width"]),
+            float(row["height"])
+        ))
+
+print("Buildings loaded:", len(buildings))
+
+
+# -----------------------------
+# Environment
+# -----------------------------
+WIDTH = 100
+HEIGHT = 100
+
+start = (5, 5)
+goal = (95, 95)
+
+
+# -----------------------------
+# Collision checking
+# -----------------------------
+def collision(point):
+
+    x, y = point
+
+    if x < 0 or x > WIDTH or y < 0 or y > HEIGHT:
+        return True
+
+    for bx, by, bw, bh in buildings:
+
+        if bx <= x <= bx + bw and by <= y <= by + bh:
+            return True
+
+    return False
+
+
+def line_collision(p1, p2):
+
+    distance = np.linalg.norm(
+        np.array(p2) - np.array(p1)
+    )
+
+    steps = int(distance / 2) + 1
+
+    for i in range(steps + 1):
+
+        t = i / steps
+
+        x = p1[0] + t * (p2[0] - p1[0])
+        y = p1[1] + t * (p2[1] - p1[1])
+
+        if collision((x, y)):
+            return True
+
+    return False
+
+
+# -----------------------------
+# RRT Node
+# -----------------------------
+class Node:
+
+    def __init__(self, point, parent=None):
+        self.point = point
+        self.parent = parent
+
+
+# -----------------------------
+# RRT Algorithm
+# -----------------------------
+def rrt():
+
+    tree = [Node(start)]
+
+    for _ in range(5000):
+
+        if random.random() < 0.1:
+            sample = goal
+        else:
+            sample = (
+                random.uniform(0, WIDTH),
+                random.uniform(0, HEIGHT)
+            )
+
+        nearest = min(
+            tree,
+            key=lambda n: np.linalg.norm(
+                np.array(n.point) -
+                np.array(sample)
+            )
+        )
+
+        dx = sample[0] - nearest.point[0]
+        dy = sample[1] - nearest.point[1]
+
+        distance = math.sqrt(dx**2 + dy**2)
+
+        if distance == 0:
+            continue
+
+        step = 3
+
+        new_point = (
+            nearest.point[0] +
+            step * dx / distance,
+
+            nearest.point[1] +
+            step * dy / distance
+        )
+
+        if not line_collision(
+            nearest.point,
+            new_point
+        ):
+
+            new_node = Node(
+                new_point,
+                nearest
+            )
+
+            tree.append(new_node)
+
+            if np.linalg.norm(
+                np.array(new_point) -
+                np.array(goal)
+            ) < 4:
+
+                if not line_collision(
+                    new_point,
+                    goal
+                ):
+
+                    goal_node = Node(
+                        goal,
+                        new_node
+                    )
+
+                    tree.append(goal_node)
+
+                    return tree, goal_node
+
+    return tree, None
+
+
+# -----------------------------
+# Run RRT
+# -----------------------------
+tree, goal_node = rrt()
+
+if goal_node is None:
+    print("No collision-free path found!")
+    exit()
+
+# -----------------------------
+# Get final path
+# -----------------------------
+path = []
+
+node = goal_node
+
+while node is not None:
+
+    path.append(node.point)
+    node = node.parent
+
+path.reverse()
+
+
+# -----------------------------
+# Calculate results
+# -----------------------------
+path_length = 0
+
+for i in range(len(path) - 1):
+
+    path_length += np.linalg.norm(
+        np.array(path[i + 1]) -
+        np.array(path[i])
+    )
+
+speed = 10
+
+detection_latency = path_length / speed
+
+coverage = min(
+    100,
+    path_length * 1.2
+)
+
+print("\n--- UAV SURVEILLANCE RESULTS ---")
+print("Path Length       :", round(path_length, 2))
+print("Coverage          :", round(coverage, 2), "%")
+print("Detection Latency :", round(detection_latency, 2), "seconds")
+
+
+# -----------------------------
+# Visualization
+# -----------------------------
+plt.figure(figsize=(8, 8))
+
+# Buildings
+for bx, by, bw, bh in buildings:
+
+    plt.gca().add_patch(
+        plt.Rectangle(
+            (bx, by),
+            bw,
+            bh,
+            alpha=0.6
+        )
+    )
+
+# RRT tree
+for node in tree:
+
+    if node.parent is not None:
+
+        plt.plot(
+            [node.point[0], node.parent.point[0]],
+            [node.point[1], node.parent.point[1]],
+            linewidth=0.5,
+            alpha=0.3
+        )
+
+# Final path
+px = [p[0] for p in path]
+py = [p[1] for p in path]
+
+plt.plot(
+    px,
+    py,
+    linewidth=3,
+    label="RRT UAV Path"
+)
+
+# Start
+plt.scatter(
+    start[0],
+    start[1],
+    s=100,
+    label="UAV Start"
+)
+
+# Goal
+plt.scatter(
+    goal[0],
+    goal[1],
+    s=100,
+    label="Target"
+)
+
+plt.xlim(0, WIDTH)
+plt.ylim(0, HEIGHT)
+
+plt.xlabel("X Coordinate")
+plt.ylabel("Y Coordinate")
+
+plt.title(
+    "RRT-Based UAV Surveillance Path Planning"
+)
+
+plt.legend()
+plt.grid()
+
+plt.show()
