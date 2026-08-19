@@ -1,0 +1,97 @@
+#Simulate an RL framework to optimize a manufacturing process, where actions represent
+different machine settings and rewards are based on product quality. Implement the
+environment, policy, and value function in Python.
+
+
+import numpy as np
+import pandas as pd
+from google.colab import files
+
+# Upload dataset
+print("Upload your manufacturing CSV dataset:")
+uploaded = files.upload()
+file = list(uploaded.keys())[0]
+
+df = pd.read_csv(file)
+print("\nDataset:")
+print(df.head())
+
+# Select numerical columns
+cols = df.select_dtypes(include=np.number).columns
+
+# Last numerical column = product quality
+quality_col = cols[-1]
+settings = cols[:-1]
+
+print("\nMachine settings:", list(settings))
+print("Quality column:", quality_col)
+
+# Environment
+class ManufacturingEnv:
+    def __init__(self, data):
+        self.data = data
+        self.n = len(data)
+        self.state = 0
+
+    def reset(self):
+        self.state = np.random.randint(self.n)
+        return self.state
+
+    def step(self, action):
+        row = self.data.iloc[self.state]
+        quality = row[quality_col]
+
+        # Reward based on product quality
+        reward = quality
+
+        # Move to another machine setting/state
+        self.state = np.random.randint(self.n)
+
+        return self.state, reward
+
+# Create environment
+env = ManufacturingEnv(df)
+
+# Policy and value function
+n_states = len(df)
+n_actions = len(settings)
+
+Q = np.zeros((n_states, n_actions))
+V = np.zeros(n_states)
+
+alpha = 0.1
+gamma = 0.9
+episodes = 500
+
+# Q-learning
+for episode in range(episodes):
+    state = env.reset()
+
+    for step in range(20):
+
+        # Epsilon-greedy policy
+        if np.random.rand() < 0.1:
+            action = np.random.randint(n_actions)
+        else:
+            action = np.argmax(Q[state])
+
+        next_state, reward = env.step(action)
+
+        Q[state, action] += alpha * (
+            reward + gamma * np.max(Q[next_state]) - Q[state, action]
+        )
+
+        V[state] = np.max(Q[state])
+        state = next_state
+
+# Display learned policy
+best_action = np.argmax(Q, axis=1)
+
+print("\nLearned Policy:")
+for i, action in enumerate(best_action[:10]):
+    print("State", i, "-> Machine Setting", settings[action])
+
+print("\nValue Function:")
+print(V[:10])
+
+print("\nMaximum Expected Quality:", np.max(V))
