@@ -1,0 +1,94 @@
+# Simulate a k-armed bandit problem to optimize marketing campaign choices. Implement
+epsilon-greedy, UCB, and Thompson Sampling algorithms in Python and evaluate their
+performance.
+
+
+import pandas as pd
+import numpy as np
+from google.colab import files
+
+# Upload dataset
+print("Upload marketing_campaign.csv")
+uploaded = files.upload()
+file = list(uploaded.keys())[0]
+
+df = pd.read_csv(file)
+print("\nDataset:")
+print(df.head())
+
+campaigns = df["Campaign"].unique()
+n = len(campaigns)
+trials = 500
+epsilon = 0.1
+
+# Get reward
+def reward(campaign):
+    return df[df["Campaign"] == campaign]["Reward"].sample(1).values[0]
+
+# ---------------- Epsilon Greedy ----------------
+Q = np.zeros(n)
+count = np.zeros(n)
+eg_reward = 0
+
+for t in range(trials):
+    if np.random.rand() < epsilon:
+        action = np.random.randint(n)
+    else:
+        action = np.argmax(Q)
+
+    r = reward(campaigns[action])
+    count[action] += 1
+    Q[action] += (r - Q[action]) / count[action]
+    eg_reward += r
+
+# ---------------- UCB ----------------
+Q = np.zeros(n)
+count = np.zeros(n)
+ucb_reward = 0
+
+for t in range(1, trials + 1):
+
+    if t <= n:
+        action = t - 1
+    else:
+        ucb = Q + np.sqrt(2 * np.log(t) / (count + 1e-5))
+        action = np.argmax(ucb)
+
+    r = reward(campaigns[action])
+    count[action] += 1
+    Q[action] += (r - Q[action]) / count[action]
+    ucb_reward += r
+
+# ---------------- Thompson Sampling ----------------
+success = np.ones(n)
+failure = np.ones(n)
+ts_reward = 0
+
+for t in range(trials):
+
+    samples = np.random.beta(success, failure)
+    action = np.argmax(samples)
+
+    r = reward(campaigns[action])
+    ts_reward += r
+
+    if r == 1:
+        success[action] += 1
+    else:
+        failure[action] += 1
+
+# Results
+print("\n--- Performance ---")
+print("Epsilon-Greedy Reward :", eg_reward)
+print("UCB Reward            :", ucb_reward)
+print("Thompson Sampling     :", ts_reward)
+
+results = {
+    "Epsilon-Greedy": eg_reward,
+    "UCB": ucb_reward,
+    "Thompson Sampling": ts_reward
+}
+
+best = max(results, key=results.get)
+
+print("\nBest Algorithm:", best)
