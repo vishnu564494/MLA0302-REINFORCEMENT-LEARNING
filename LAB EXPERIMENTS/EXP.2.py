@@ -1,3 +1,12 @@
+#A robot navigates a warehouse to pick and place items. Define states (locations in the
+warehouse), actions (move in four directions), and rewards (picking an item: +2, reaching
+the goal: +5, hitting an obstacle: -2). Implement a policy evaluation algorithm to determine
+the value function for a given policy in Python.
+
+
+
+
+
 import numpy as np
 import csv
 import os
