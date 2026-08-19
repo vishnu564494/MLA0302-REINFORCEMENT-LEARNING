@@ -1,0 +1,135 @@
+#Train an AI agent to compete in autonomous vehicle racing competitions using Advantage
+Actor-Critic (A2C) methods. Implement A2C in Python to learn aggressive driving policies
+that optimize lap times and race performance.
+
+
+
+
+
+import pandas as pd
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras import layers
+from google.colab import files
+
+# Upload racing dataset
+print("Upload racing_dataset.csv")
+uploaded = files.upload()
+
+file = list(uploaded.keys())[0]
+df = pd.read_csv(file)
+
+print("\nDataset:")
+print(df.head())
+
+# State: speed, distance, curve, opponent distance, fuel
+X = df[
+    ["speed", "distance", "curve",
+     "opponent_distance", "fuel"]
+].values.astype("float32")
+
+# Normalize states
+X = X / (X.max(axis=0) + 1e-8)
+
+# Reward
+R = df["reward"].values.astype("float32")
+
+# Actions:
+# 0 = Brake
+# 1 = Accelerate
+# 2 = Steer
+
+# Actor network
+actor = tf.keras.Sequential([
+    layers.Dense(32, activation="relu"),
+    layers.Dense(16, activation="relu"),
+    layers.Dense(3, activation="softmax")
+])
+
+# Critic network
+critic = tf.keras.Sequential([
+    layers.Dense(32, activation="relu"),
+    layers.Dense(16, activation="relu"),
+    layers.Dense(1)
+])
+
+optimizer = tf.keras.optimizers.Adam(0.001)
+
+# A2C Training
+for episode in range(100):
+
+    i = np.random.randint(len(X))
+    state = X[i]
+    reward = R[i]
+
+    with tf.GradientTape() as tape:
+
+        # Actor selects action
+        probabilities = actor(
+            state.reshape(1, -1)
+        )[0]
+
+        # Critic estimates value
+        value = critic(
+            state.reshape(1, -1)
+        )[0, 0]
+
+        # Advantage
+        advantage = reward - value
+
+        # Select action
+        action = tf.random.categorical(
+            tf.math.log(
+                probabilities[None, :]
+            ), 1
+        )[0, 0]
+
+        # Actor loss
+        actor_loss = -tf.math.log(
+            probabilities[action] + 1e-8
+        ) * advantage
+
+        # Critic loss
+        critic_loss = advantage ** 2
+
+        # Total A2C loss
+        loss = actor_loss + critic_loss
+
+    variables = (
+        actor.trainable_variables +
+        critic.trainable_variables
+    )
+
+    gradients = tape.gradient(
+        loss, variables
+    )
+
+    optimizer.apply_gradients(
+        zip(gradients, variables)
+    )
+
+    if episode % 20 == 0:
+        print(
+            "Episode:", episode,
+            "Reward:", round(float(reward), 2)
+        )
+
+# Test trained agent
+state = X[0]
+
+probabilities = actor(
+    state.reshape(1, -1)
+).numpy()[0]
+
+action = np.argmax(probabilities)
+
+actions = [
+    "Brake",
+    "Accelerate",
+    "Steer"
+]
+
+print("\n--- A2C Racing Agent ---")
+print("Best Action:", actions[action])
+print("Action Probabilities:", probabilities)
+print("Agent learned aggressive driving policy.")
