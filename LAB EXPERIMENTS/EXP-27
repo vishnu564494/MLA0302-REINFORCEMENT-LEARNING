@@ -1,0 +1,102 @@
+#Implement an agent that manages a financial portfolio, choosing stocks to maximize returns
+and minimize risk using an Actor-Critic (A3C) method to optimize investment. Implement a
+robot that navigates a maze to reach the exit, with rewards for reaching the exit and
+penalties for hitting walls, and use REINFORCE to find the optimal navigation policy.
+
+
+import pandas as pd
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras import layers
+from google.colab import files
+
+# Upload dataset
+print("Upload stock_returns.csv")
+uploaded = files.upload()
+
+file = list(uploaded.keys())[0]
+df = pd.read_csv(file)
+
+print("\nDataset:")
+print(df.head())
+
+# Data
+data = df.values.astype("float32")
+n = data.shape[1]
+
+# Actor
+actor = tf.keras.Sequential([
+    layers.Dense(16, activation="relu"),
+    layers.Dense(n, activation="softmax")
+])
+
+# Critic
+critic = tf.keras.Sequential([
+    layers.Dense(16, activation="relu"),
+    layers.Dense(1)
+])
+
+optimizer = tf.keras.optimizers.Adam(0.01)
+
+# A3C training
+for episode in range(50):
+
+    state = data[np.random.randint(len(data))]
+
+    with tf.GradientTape() as tape:
+
+        weights = actor(
+            state.reshape(1, -1)
+        )[0]
+
+        value = critic(
+            state.reshape(1, -1)
+        )[0]
+
+        # Return
+        ret = tf.reduce_sum(weights * state)
+
+        # Risk
+        risk = tf.math.reduce_std(weights * state)
+
+        # Reward = return - risk
+        reward = ret - 0.5 * risk
+
+        loss = -reward + tf.square(
+            reward - value
+        )
+
+    gradients = tape.gradient(
+        loss,
+        actor.trainable_variables +
+        critic.trainable_variables
+    )
+
+    optimizer.apply_gradients(
+        zip(
+            gradients,
+            actor.trainable_variables +
+            critic.trainable_variables
+        )
+    )
+
+    if episode % 10 == 0:
+        print(
+            "Episode:", episode,
+            "Reward:", round(float(reward), 4)
+        )
+
+# Final portfolio
+weights = actor(
+    data[-1].reshape(1, -1)
+).numpy()[0]
+
+print("\nOptimal Portfolio:")
+
+for stock, weight in zip(df.columns, weights):
+    print(
+        stock,
+        ":",
+        round(weight * 100, 2),
+        "%"
+    )
