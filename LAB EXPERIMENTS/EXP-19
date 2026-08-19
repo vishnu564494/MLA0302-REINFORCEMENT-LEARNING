@@ -1,0 +1,63 @@
+#Use Monte Carlo methods to evaluate a policy for predicting customer churn in a
+subscription-based service. Implement this policy evaluation in Python and analyze the
+results.
+
+
+
+import pandas as pd
+import numpy as np
+from google.colab import files
+
+# Upload dataset
+print("Upload customer_churn.csv")
+uploaded = files.upload()
+
+file = list(uploaded.keys())[0]
+df = pd.read_csv(file)
+
+print("\nDataset:")
+print(df.head())
+
+# Create states
+def get_state(row):
+    if row["MonthlyCharges"] > 70 and row["SupportCalls"] > 4:
+        return "High Risk"
+    elif row["MonthlyCharges"] > 60 or row["SupportCalls"] > 3:
+        return "Medium Risk"
+    else:
+        return "Low Risk"
+
+df["State"] = df.apply(get_state, axis=1)
+
+# Monte Carlo Policy Evaluation
+states = ["Low Risk", "Medium Risk", "High Risk"]
+V = {s: 0 for s in states}
+returns = {s: [] for s in states}
+
+episodes = 500
+
+for episode in range(episodes):
+
+    row = df.sample(1).iloc[0]
+    state = row["State"]
+
+    # Reward: +1 retained, -1 churned
+    reward = 1 if row["Churn"] == 0 else -1
+
+    returns[state].append(reward)
+
+    # First-visit Monte Carlo value
+    V[state] = np.mean(returns[state])
+
+print("\nMonte Carlo Policy Evaluation:")
+for state in states:
+    print(state, "Value =", round(V[state], 3))
+
+# Analyze results
+print("\nAnalysis:")
+
+for state in states:
+    if V[state] > 0:
+        print(state, ": Low churn risk / good customer retention")
+    else:
+        print(state, ": High churn risk / customer may leave")
