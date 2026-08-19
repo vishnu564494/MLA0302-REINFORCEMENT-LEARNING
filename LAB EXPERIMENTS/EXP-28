@@ -1,0 +1,113 @@
+#Develop an AI agent to play a real-time strategy game (e.g., Age of Empires) using ActorCritic
+methods. Implement the actor and critic networks in Python and train the agent to build
+structures, gather resources, and engage in strategic combat.
+
+
+
+import pandas as pd
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras import layers
+from google.colab import files
+
+# Upload dataset
+print("Upload rts_game_dataset.csv")
+uploaded = files.upload()
+
+file = list(uploaded.keys())[0]
+df = pd.read_csv(file)
+
+print("\nDataset:")
+print(df.head())
+
+# State data
+X = df[
+    ["resources", "food", "wood",
+     "enemy_strength", "army"]
+].values.astype("float32")
+
+# Normalize
+X = X / X.max(axis=0)
+
+actions = 3
+# 0 = Gather, 1 = Build, 2 = Attack
+
+# Actor
+actor = tf.keras.Sequential([
+    layers.Dense(16, activation="relu"),
+    layers.Dense(actions, activation="softmax")
+])
+
+# Critic
+critic = tf.keras.Sequential([
+    layers.Dense(16, activation="relu"),
+    layers.Dense(1)
+])
+
+optimizer = tf.keras.optimizers.Adam(0.01)
+
+# Actor-Critic training
+for episode in range(100):
+
+    i = np.random.randint(len(X))
+    state = X[i]
+    reward = df["reward"].iloc[i]
+
+    with tf.GradientTape() as tape:
+
+        action_prob = actor(
+            state.reshape(1, -1)
+        )[0]
+
+        value = critic(
+            state.reshape(1, -1)
+        )[0]
+
+        advantage = reward - value
+
+        actor_loss = -tf.math.log(
+            tf.reduce_max(action_prob)
+        ) * advantage
+
+        critic_loss = advantage ** 2
+
+        loss = actor_loss + critic_loss
+
+    gradients = tape.gradient(
+        loss,
+        actor.trainable_variables +
+        critic.trainable_variables
+    )
+
+    optimizer.apply_gradients(
+        zip(
+            gradients,
+            actor.trainable_variables +
+            critic.trainable_variables
+        )
+    )
+
+    if episode % 20 == 0:
+        print(
+            "Episode:", episode,
+            "Reward:", round(float(reward), 2)
+        )
+
+# Test agent
+state = X[0]
+
+prob = actor(
+    state.reshape(1, -1)
+).numpy()[0]
+
+action = np.argmax(prob)
+
+names = [
+    "Gather Resources",
+    "Build Structure",
+    "Attack Enemy"
+]
+
+print("\nAI Decision:")
+print(names[action])
+print("Action probabilities:", prob)
