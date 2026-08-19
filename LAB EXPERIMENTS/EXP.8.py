@@ -1,7 +1,6 @@
-#A delivery robot operates in a warehouse with predefined delivery points. Using Bellman
-equations, compute the state-value function for navigating to each delivery point.
-Implement this in Python and visualize the value function for different policies.
-
+#Simulate an autonomous car navigating a simple road network with intersections. Design
+policies for the car to follow traffic rules and reach the destination safely. Implement these
+policies in Python and evaluate their effectiveness.
 
 
 from google.colab import files
