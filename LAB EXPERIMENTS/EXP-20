@@ -1,0 +1,66 @@
+#Implement an epsilon-greedy strategy to optimize content recommendations on an online
+learning platform. Write a Python script to simulate and analyze its performance over
+multiple runs.
+
+
+import pandas as pd
+import numpy as np
+from google.colab import files
+
+# Upload dataset
+print("Upload content_recommendation.csv")
+uploaded = files.upload()
+
+file = list(uploaded.keys())[0]
+df = pd.read_csv(file)
+
+print("\nDataset:")
+print(df.head())
+
+# Content items
+contents = df["ContentType"].unique()
+n = len(contents)
+
+# Epsilon-greedy parameters
+epsilon = 0.1
+runs = 5
+episodes = 100
+
+results = []
+
+for run in range(runs):
+
+    Q = np.zeros(n)
+    count = np.zeros(n)
+    total_reward = 0
+
+    for episode in range(episodes):
+
+        # Epsilon-greedy selection
+        if np.random.rand() < epsilon:
+            action = np.random.randint(n)
+        else:
+            action = np.argmax(Q)
+
+        # Get reward from selected content
+        content = contents[action]
+        reward = df[df["ContentType"] == content]["Reward"].sample(1).values[0]
+
+        # Update average reward
+        count[action] += 1
+        Q[action] += (reward - Q[action]) / count[action]
+
+        total_reward += reward
+
+    results.append(total_reward)
+
+print("\nPerformance over multiple runs:")
+for i, reward in enumerate(results):
+    print("Run", i + 1, "Total Reward =", reward)
+
+print("\nAverage Reward:", np.mean(results))
+print("Best Reward:", np.max(results))
+print("Worst Reward:", np.min(results))
+
+print("\nLearned Best Content:")
+print(contents[np.argmax(Q)])
