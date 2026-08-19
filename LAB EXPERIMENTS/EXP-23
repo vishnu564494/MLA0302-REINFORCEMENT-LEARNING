@@ -1,0 +1,90 @@
+ # Explain the relationship between policy and value functions using a practical gridworld
+   example. Implement this relationship in Python and visualize how different policies affect
+   the value function.
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# 4x4 GridWorld
+size = 4
+goal = (3, 3)
+actions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+
+# Policy 1: Move towards goal
+policy1 = {}
+for r in range(size):
+    for c in range(size):
+        if (r, c) != goal:
+            if r < 3:
+                policy1[(r, c)] = 0       # Down
+            else:
+                policy1[(r, c)] = 2       # Right
+
+# Policy 2: Random policy
+policy2 = {}
+for r in range(size):
+    for c in range(size):
+        if (r, c) != goal:
+            policy2[(r, c)] = np.random.randint(4)
+
+# Value function
+def evaluate_policy(policy, episodes=1000, gamma=0.9):
+
+    V = np.zeros((size, size))
+
+    for _ in range(episodes):
+        state = (0, 0)
+        visited = []
+
+        for step in range(30):
+            if state == goal:
+                break
+
+            visited.append(state)
+
+            action = policy[state]
+            dr, dc = actions[action]
+
+            nr = max(0, min(size - 1, state[0] + dr))
+            nc = max(0, min(size - 1, state[1] + dc))
+
+            state = (nr, nc)
+
+        # Reward for reaching goal
+        reward = 10 if state == goal else -1
+
+        # Update values
+        for i, s in enumerate(visited):
+            V[s] += reward * (gamma ** i)
+
+    return V / episodes
+
+# Evaluate both policies
+V1 = evaluate_policy(policy1)
+V2 = evaluate_policy(policy2)
+
+# Display value functions
+print("Value Function - Goal Directed Policy")
+print(np.round(V1, 2))
+
+print("\nValue Function - Random Policy")
+print(np.round(V2, 2))
+
+# Visualization
+plt.figure(figsize=(10, 4))
+
+plt.subplot(1, 2, 1)
+plt.imshow(V1)
+plt.title("Goal-Directed Policy")
+plt.colorbar()
+plt.xticks(range(size))
+plt.yticks(range(size))
+
+plt.subplot(1, 2, 2)
+plt.imshow(V2)
+plt.title("Random Policy")
+plt.colorbar()
+plt.xticks(range(size))
+plt.yticks(range(size))
+
+plt.show()
