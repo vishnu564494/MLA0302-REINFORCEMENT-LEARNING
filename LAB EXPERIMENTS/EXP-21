@@ -1,0 +1,78 @@
+#Use the Upper Confidence Bound (UCB) algorithm to dynamically select content for users on
+a streaming platform. Implement the UCB algorithm in Python and compare its effectiveness
+against other strategies.
+
+
+
+import pandas as pd
+import numpy as np
+from google.colab import files
+
+# Upload dataset
+print("Upload streaming_content.csv")
+uploaded = files.upload()
+
+file = list(uploaded.keys())[0]
+df = pd.read_csv(file)
+
+print("\nDataset:")
+print(df.head())
+
+contents = df["Content"].unique()
+n = len(contents)
+trials = 500
+epsilon = 0.1
+
+def get_reward(content):
+    return df[df["Content"] == content]["Reward"].sample(1).values[0]
+
+# ---------------- UCB ----------------
+Q = np.zeros(n)
+count = np.zeros(n)
+ucb_reward = 0
+
+for t in range(1, trials + 1):
+
+    if t <= n:
+        action = t - 1
+    else:
+        ucb = Q + np.sqrt(2 * np.log(t) / (count + 1e-5))
+        action = np.argmax(ucb)
+
+    reward = get_reward(contents[action])
+    count[action] += 1
+    Q[action] += (reward - Q[action]) / count[action]
+    ucb_reward += reward
+
+# ---------------- Epsilon Greedy ----------------
+Qe = np.zeros(n)
+count_e = np.zeros(n)
+epsilon_reward = 0
+
+for _ in range(trials):
+
+    if np.random.rand() < epsilon:
+        action = np.random.randint(n)
+    else:
+        action = np.argmax(Qe)
+
+    reward = get_reward(contents[action])
+    count_e[action] += 1
+    Qe[action] += (reward - Qe[action]) / count_e[action]
+    epsilon_reward += reward
+
+# ---------------- Random Strategy ----------------
+random_reward = 0
+
+for _ in range(trials):
+    action = np.random.randint(n)
+    random_reward += get_reward(contents[action])
+
+# Results
+print("\n--- Performance Comparison ---")
+print("UCB Total Reward       :", ucb_reward)
+print("Epsilon-Greedy Reward  :", epsilon_reward)
+print("Random Strategy Reward :", random_reward)
+
+print("\nBest Content using UCB:")
+print(contents[np.argmax(Q)])
