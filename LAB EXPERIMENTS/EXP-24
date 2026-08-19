@@ -1,0 +1,63 @@
+# In an inventory management system, use Bellman’s equation to find the optimal policy for
+ordering stock. Implement this in Python and demonstrate how the optimal policy minimizes
+costs
+
+import pandas as pd
+import numpy as np
+from google.colab import files
+
+# Upload dataset
+print("Upload inventory_management.csv")
+uploaded = files.upload()
+file = list(uploaded.keys())[0]
+
+df = pd.read_csv(file)
+print("\nDataset:")
+print(df)
+
+# Inventory states
+states = df["Inventory"].values
+actions = [0, 2, 4]       # order quantities
+
+gamma = 0.9
+V = np.zeros(len(states))
+policy = np.zeros(len(states), dtype=int)
+
+# Bellman equation
+for _ in range(100):
+    new_V = np.zeros(len(states))
+
+    for i, s in enumerate(states):
+        costs = []
+
+        for a in actions:
+            inventory = min(s + a, 10)
+            remaining = inventory - 2
+
+            if remaining >= 0:
+                cost = a * 3 + remaining * 2
+                next_state = remaining
+            else:
+                cost = a * 3 + abs(remaining) * 8
+                next_state = 0
+
+            total_cost = cost + gamma * V[next_state]
+            costs.append(total_cost)
+
+        new_V[i] = min(costs)
+        policy[i] = actions[np.argmin(costs)]
+
+    if np.max(abs(new_V - V)) < 0.001:
+        break
+
+    V = new_V
+
+# Display results
+print("\nOptimal Policy")
+print("---------------------------")
+print("Inventory | Order | Cost")
+
+for i, s in enumerate(states):
+    print(f"{s:9} | {policy[i]:5} | {V[i]:.2f}")
+
+print("\nMinimum Cost:", round(np.min(V), 2))
