@@ -1,0 +1,378 @@
+# Model a smart grid that manages energy consumption and production to minimize costs and
+balance supply and demand using Trust Region Policy Optimization (TRPO) to optimize
+energy management.
+
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from google.colab import files
+
+# ==========================================================
+# 1. UPLOAD DATASET
+# ==========================================================
+print("Upload smart_grid.csv")
+uploaded = files.upload()
+
+file = list(uploaded.keys())[0]
+df = pd.read_csv(file)
+
+print("\nUploaded Dataset:")
+print(df)
+
+# ==========================================================
+# 2. SMART GRID ENVIRONMENT
+# ==========================================================
+class SmartGridEnv:
+
+    def __init__(self, data):
+        self.demand = data["Demand"].values
+        self.production = data["Production"].values
+        self.price = data["EnergyPrice"].values
+
+        self.n_steps = len(data)
+        self.max_battery = 10
+        self.start_battery = 5
+
+        # Actions:
+        # 0 = Discharge
+        # 1 = Idle
+        # 2 = Charge
+        self.actions = [-1, 0, 1]
+
+    def reset(self):
+        self.battery = self.start_battery
+        self.t = 0
+        return self.get_state()
+
+    def get_state(self):
+        # State = time + battery level
+        return (self.t, self.battery)
+
+    def step(self, action_index):
+
+        action = self.actions[action_index]
+
+        # Update battery
+        new_battery = np.clip(
+            self.battery + action,
+            0,
+            self.max_battery
+        )
+
+        actual_action = new_battery - self.battery
+        self.battery = new_battery
+
+        # Effective energy supply
+        supply = self.production[self.t] + actual_action
+        demand = self.demand[self.t]
+
+        # Energy bought from grid
+        grid_energy = max(0, demand - supply)
+
+        # Excess energy
+        excess = max(0, supply - demand)
+
+        # Cost
+        cost = grid_energy * self.price[self.t]
+
+        # Small benefit for using excess energy efficiently
+        cost += 0.5 * excess
+
+        # Reward = negative cost
+        reward = -cost
+
+        self.t += 1
+
+        done = self.t >= self.n_steps
+
+        next_state = None if done else self.get_state()
+
+        return next_state, reward, done
+
+
+# ==========================================================
+# 3. POLICY
+# ==========================================================
+env = SmartGridEnv(df)
+
+n_states = env.n_steps * 11
+n_actions = 3
+
+def state_id(state):
+    t, battery = state
+    return t * 11 + battery
+
+
+# ==========================================================
+# 4. SOFTMAX POLICY
+# ==========================================================
+theta = np.zeros((n_states, n_actions))
+
+def softmax(x):
+    x = x - np.max(x)
+    e = np.exp(x)
+    return e / np.sum(e)
+
+def get_probs(state, params):
+    return softmax(params[state_id(state)])
+
+
+# ==========================================================
+# 5. COLLECT TRAJECTORY
+# ==========================================================
+def collect_episode(params):
+
+    state = env.reset()
+
+    states = []
+    actions = []
+    rewards = []
+    probs = []
+
+    done = False
+
+    while not done:
+
+        p = get_probs(state, params)
+
+        action = np.random.choice(n_actions, p=p)
+
+        next_state, reward, done = env.step(action)
+
+        states.append(state)
+        actions.append(action)
+        rewards.append(reward)
+        probs.append(p)
+
+        state = next_state
+
+    return states, actions, rewards, probs
+
+
+# ==========================================================
+# 6. DISCOUNTED RETURNS
+# ==========================================================
+def calculate_returns(rewards, gamma=0.95):
+
+    G = 0
+    returns = []
+
+    for r in reversed(rewards):
+        G = r + gamma * G
+        returns.append(G)
+
+    return np.array(returns[::-1])
+
+
+# ==========================================================
+# 7. ADVANTAGE FUNCTION
+# ==========================================================
+value = np.zeros(n_states)
+
+def calculate_advantages(states, returns):
+
+    advantages = []
+
+    for s, G in zip(states, returns):
+        sid = state_id(s)
+
+        # Advantage = Return - Value
+        A = G - value[sid]
+
+        advantages.append(A)
+
+        # Update value estimate
+        value[sid] += 0.1 * A
+
+    advantages = np.array(advantages)
+
+    # Normalize advantages
+    advantages = (
+        advantages - np.mean(advantages)
+    ) / (np.std(advantages) + 1e-8)
+
+    return advantages
+
+
+# ==========================================================
+# 8. POLICY GRADIENT
+# ==========================================================
+def policy_gradient(states, actions, advantages, params):
+
+    grad = np.zeros_like(params)
+
+    for s, a, A in zip(states, actions, advantages):
+
+        sid = state_id(s)
+        p = get_probs(s, params)
+
+        one_hot = np.zeros(n_actions)
+        one_hot[a] = 1
+
+        grad[sid] += A * (one_hot - p)
+
+    return grad
+
+
+# ==========================================================
+# 9. KL DIVERGENCE
+# ==========================================================
+def kl_divergence(old_params, new_params, states):
+
+    total_kl = 0
+
+    for state in states:
+
+        old_p = get_probs(state, old_params)
+        new_p = get_probs(state, new_params)
+
+        total_kl += np.sum(
+            old_p * np.log(
+                (old_p + 1e-10) /
+                (new_p + 1e-10)
+            )
+        )
+
+    return total_kl / len(states)
+
+
+# ==========================================================
+# 10. TRPO UPDATE
+# ==========================================================
+def trpo_update(params, gradient, states):
+
+    # Search directions
+    direction = gradient / (
+        np.linalg.norm(gradient) + 1e-8
+    )
+
+    old_params = params.copy()
+
+    # Trust-region KL constraint
+    max_kl = 0.01
+
+    step_sizes = [
+        1.0, 0.5, 0.25, 0.1, 0.05
+    ]
+
+    for step in step_sizes:
+
+        new_params = old_params + step * direction
+
+        kl = kl_divergence(
+            old_params,
+            new_params,
+            states
+        )
+
+        if kl <= max_kl:
+
+            return new_params
+
+    return old_params
+
+
+# ==========================================================
+# 11. TRAIN TRPO
+# ==========================================================
+episodes = 500
+reward_history = []
+
+print("\nTraining TRPO...\n")
+
+for episode in range(episodes):
+
+    states, actions, rewards, probs = collect_episode(theta)
+
+    returns = calculate_returns(rewards)
+
+    advantages = calculate_advantages(
+        states,
+        returns
+    )
+
+    gradient = policy_gradient(
+        states,
+        actions,
+        advantages,
+        theta
+    )
+
+    theta = trpo_update(
+        theta,
+        gradient,
+        states
+    )
+
+    total_reward = sum(rewards)
+
+    reward_history.append(total_reward)
+
+    if episode % 50 == 0:
+        print(
+            "Episode:", episode,
+            "Reward:", round(total_reward, 2)
+        )
+
+
+# ==========================================================
+# 12. TEST TRAINED POLICY
+# ==========================================================
+def test_policy(params):
+
+    state = env.reset()
+
+    total_reward = 0
+    total_cost = 0
+
+    print("\nLearned Energy Management Policy")
+    print("--------------------------------")
+
+    while True:
+
+        p = get_probs(state, params)
+
+        action = np.argmax(p)
+
+        next_state, reward, done = env.step(action)
+
+        print(
+            "Time:", state[0] + 1,
+            "Battery:", state[1],
+            "Action:",
+            ["Discharge", "Idle", "Charge"][action],
+            "Reward:", round(reward, 2)
+        )
+
+        total_reward += reward
+        total_cost += -reward
+
+        if done:
+            break
+
+        state = next_state
+
+    return total_reward, total_cost
+
+
+reward, cost = test_policy(theta)
+
+print("\n================================")
+print("FINAL RESULTS")
+print("================================")
+print("Total Reward:", round(reward, 2))
+print("Total Energy Cost:", round(cost, 2))
+
+
+# ==========================================================
+# 13. PLOT PERFORMANCE
+# ==========================================================
+plt.figure(figsize=(8, 5))
+plt.plot(reward_history)
+plt.xlabel("Episode")
+plt.ylabel("Total Reward")
+plt.title("TRPO Smart Grid Learning")
+plt.grid()
+plt.show()
