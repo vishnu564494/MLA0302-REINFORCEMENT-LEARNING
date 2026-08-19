@@ -1,0 +1,115 @@
+#Train a virtual character to create engaging content (e.g., storytelling, interactive
+experiences) within a simulated virtual world using policy gradient methods. Implement the
+policy gradient algorithm in Python to optimize the character&#39;s behavior for maximum
+audience engagement.
+
+
+
+
+import pandas as pd
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras import layers
+from google.colab import files
+
+# Upload dataset
+print("Upload virtual_character_engagement_dataset.csv")
+uploaded = files.upload()
+
+file = list(uploaded.keys())[0]
+df = pd.read_csv(file)
+
+print("\nDataset:")
+print(df.head())
+
+# State
+X = df[
+    ["story_quality",
+     "interaction",
+     "exploration",
+     "humor",
+     "audience_feedback"]
+].values.astype("float32")
+
+# Normalize
+X = X / 10.0
+
+# Reward = audience engagement
+R = df["engagement"].values.astype("float32")
+
+# Actions
+# 0 = Storytelling
+# 1 = Interaction
+# 2 = Exploration
+# 3 = Humor
+
+# Policy Network
+policy = tf.keras.Sequential([
+    layers.Dense(16, activation="relu"),
+    layers.Dense(4, activation="softmax")
+])
+
+optimizer = tf.keras.optimizers.Adam(0.01)
+
+# Policy Gradient Training
+for episode in range(100):
+
+    i = np.random.randint(len(X))
+    state = X[i]
+    reward = R[i]
+
+    with tf.GradientTape() as tape:
+
+        probabilities = policy(
+            state.reshape(1, -1)
+        )[0]
+
+        # Select action
+        action = tf.random.categorical(
+            tf.math.log([probabilities]),
+            1
+        )[0, 0]
+
+        # Policy Gradient loss
+        loss = -tf.math.log(
+            probabilities[action] + 1e-8
+        ) * reward
+
+    gradients = tape.gradient(
+        loss,
+        policy.trainable_variables
+    )
+
+    optimizer.apply_gradients(
+        zip(
+            gradients,
+            policy.trainable_variables
+        )
+    )
+
+    if episode % 20 == 0:
+        print(
+            "Episode:", episode,
+            "Engagement:", round(float(reward), 2)
+        )
+
+# Test trained character
+state = X[0]
+
+probabilities = policy(
+    state.reshape(1, -1)
+).numpy()[0]
+
+action = np.argmax(probabilities)
+
+actions = [
+    "Storytelling",
+    "Interaction",
+    "Exploration",
+    "Humor"
+]
+
+print("\n--- Virtual Character ---")
+print("Best Behavior:", actions[action])
+print("Action Probabilities:", probabilities)
+print("Maximum Audience Engagement Policy Learned!")
