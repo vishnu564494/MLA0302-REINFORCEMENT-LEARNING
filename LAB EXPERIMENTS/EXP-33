@@ -1,0 +1,58 @@
+#Implement a value-equivalence prediction model to estimate the long-term performance of
+different investment portfolios. Use historical financial data and machine learning
+techniques to predict the value equivalence of alternative portfolio allocations. Write a
+Python program to analyze and compare the predicted performances of various investment
+strategies.
+
+
+
+import pandas as pd
+import numpy as np
+from google.colab import files
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+
+# Upload dataset
+f = files.upload()
+df = pd.read_csv(list(f.keys())[0])
+
+print(df.head())
+
+# Features and target
+X = df[["Stocks", "Bonds", "Gold", "Real_Estate"]]
+y = df["Portfolio_Return"]
+
+# Train ML model
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+model = RandomForestRegressor(
+    n_estimators=100,
+    random_state=42
+)
+
+model.fit(X_train, y_train)
+
+# Portfolio strategies
+strategies = pd.DataFrame({
+    "Stocks": [70, 50, 30],
+    "Bonds": [20, 30, 50],
+    "Gold": [5, 10, 15],
+    "Real_Estate": [5, 10, 5]
+})
+
+# Predict performance
+strategies["Predicted_Return"] = model.predict(
+    strategies[["Stocks", "Bonds", "Gold", "Real_Estate"]]
+)
+
+print("\nPortfolio Comparison:")
+print(strategies)
+
+best = strategies.loc[
+    strategies["Predicted_Return"].idxmax()
+]
+
+print("\nBest Strategy:")
+print(best)
