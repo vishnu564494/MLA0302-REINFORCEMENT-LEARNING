@@ -1,0 +1,412 @@
+#A retail company aims to optimize its inventory management strategy using model-based RL.
+Develop a data generation model that simulates customer demand patterns and inventory
+dynamics. Use Python to generate synthetic data and evaluate different inventory
+management policies based on the simulated environment.
+
+
+
+# =========================================================
+# RETAIL INVENTORY MANAGEMENT USING MODEL-BASED RL
+# =========================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from google.colab import files
+
+# =========================================================
+# 1. UPLOAD DATASET
+# =========================================================
+
+print("Please upload the retail inventory CSV dataset:")
+
+uploaded = files.upload()
+
+filename = list(uploaded.keys())[0]
+
+data = pd.read_csv(filename)
+
+print("\nDataset uploaded successfully!")
+print("File:", filename)
+
+print("\nFirst 10 rows:")
+print(data.head(10))
+
+print("\nDataset shape:", data.shape)
+
+
+# =========================================================
+# 2. CHECK DATASET
+# =========================================================
+
+required_columns = [
+    "Day",
+    "Expected_Demand",
+    "Customer_Demand",
+    "Promotion"
+]
+
+for column in required_columns:
+    if column not in data.columns:
+        raise ValueError(
+            "Missing required column: " + column
+        )
+
+print("\nDataset validation successful!")
+
+
+# =========================================================
+# 3. INVENTORY ENVIRONMENT
+# =========================================================
+
+class InventoryEnvironment:
+
+    def __init__(self, data):
+
+        self.data = data
+
+        self.initial_inventory = 180
+        self.max_order = 150
+
+        self.holding_cost = 1
+        self.stockout_cost = 8
+        self.ordering_cost = 25
+        self.purchase_cost = 12
+        self.selling_price = 20
+
+    def simulate_policy(self, policy):
+
+        inventory = self.initial_inventory
+
+        total_cost = 0
+        total_profit = 0
+        total_stockout = 0
+        total_sales = 0
+
+        for i in range(len(self.data)):
+
+            demand = int(
+                self.data.loc[i, "Customer_Demand"]
+            )
+
+            expected_demand = float(
+                self.data.loc[i, "Expected_Demand"]
+            )
+
+            # -----------------------------------------
+            # Inventory policy
+            # -----------------------------------------
+
+            if policy == "Conservative":
+
+                order = 30
+
+            elif policy == "Moderate":
+
+                order = 70
+
+            elif policy == "Aggressive":
+
+                order = 120
+
+            elif policy == "Demand-Based":
+
+                order = int(
+                    min(
+                        max(
+                            2 * expected_demand,
+                            0
+                        ),
+                        self.max_order
+                    )
+                )
+
+            else:
+
+                order = 50
+
+            # -----------------------------------------
+            # Inventory update
+            # -----------------------------------------
+
+            inventory += order
+
+            # -----------------------------------------
+            # Customer sales
+            # -----------------------------------------
+
+            sales = min(
+                inventory,
+                demand
+            )
+
+            stockout = max(
+                0,
+                demand - sales
+            )
+
+            inventory -= sales
+
+            # -----------------------------------------
+            # Costs
+            # -----------------------------------------
+
+            holding = (
+                inventory *
+                self.holding_cost
+            )
+
+            stockout_penalty = (
+                stockout *
+                self.stockout_cost
+            )
+
+            ordering = (
+                order *
+                self.ordering_cost
+            )
+
+            purchasing = (
+                order *
+                self.purchase_cost
+            )
+
+            revenue = (
+                sales *
+                self.selling_price
+            )
+
+            # -----------------------------------------
+            # Profit
+            # -----------------------------------------
+
+            profit = (
+                revenue
+                - holding
+                - stockout_penalty
+                - ordering
+                - purchasing
+            )
+
+            total_cost += (
+                holding
+                + stockout_penalty
+                + ordering
+                + purchasing
+            )
+
+            total_profit += profit
+
+            total_stockout += stockout
+
+            total_sales += sales
+
+        return {
+
+            "Policy": policy,
+
+            "Total Cost":
+                round(total_cost, 2),
+
+            "Total Profit":
+                round(total_profit, 2),
+
+            "Total Stockout":
+                total_stockout,
+
+            "Total Sales":
+                total_sales
+        }
+
+
+# =========================================================
+# 4. CREATE ENVIRONMENT
+# =========================================================
+
+env = InventoryEnvironment(data)
+
+
+# =========================================================
+# 5. EVALUATE POLICIES
+# =========================================================
+
+policies = [
+
+    "Conservative",
+
+    "Moderate",
+
+    "Aggressive",
+
+    "Demand-Based"
+]
+
+results = []
+
+for policy in policies:
+
+    result = env.simulate_policy(
+        policy
+    )
+
+    results.append(result)
+
+
+results_df = pd.DataFrame(
+    results
+)
+
+
+# =========================================================
+# 6. DISPLAY RESULTS
+# =========================================================
+
+print("\n========================================")
+print("INVENTORY POLICY EVALUATION")
+print("========================================")
+
+print(
+    results_df.to_string(index=False)
+)
+
+
+# =========================================================
+# 7. FIND BEST POLICY
+# =========================================================
+
+best_policy = results_df.loc[
+    results_df["Total Profit"].idxmax()
+]
+
+print("\n========================================")
+print("BEST INVENTORY POLICY")
+print("========================================")
+
+print(
+    "Policy:",
+    best_policy["Policy"]
+)
+
+print(
+    "Total Profit:",
+    best_policy["Total Profit"]
+)
+
+print(
+    "Total Cost:",
+    best_policy["Total Cost"]
+)
+
+print(
+    "Total Stockout:",
+    best_policy["Total Stockout"]
+)
+
+
+# =========================================================
+# 8. PROFIT COMPARISON
+# =========================================================
+
+plt.figure(figsize=(10, 5))
+
+plt.bar(
+    results_df["Policy"],
+    results_df["Total Profit"]
+)
+
+plt.xlabel("Inventory Policy")
+plt.ylabel("Total Profit")
+
+plt.title(
+    "Inventory Policy Profit Comparison"
+)
+
+plt.xticks(rotation=20)
+
+plt.tight_layout()
+
+plt.show()
+
+
+# =========================================================
+# 9. STOCKOUT COMPARISON
+# =========================================================
+
+plt.figure(figsize=(10, 5))
+
+plt.bar(
+    results_df["Policy"],
+    results_df["Total Stockout"]
+)
+
+plt.xlabel("Inventory Policy")
+
+plt.ylabel(
+    "Total Stockout Units"
+)
+
+plt.title(
+    "Inventory Stockout Comparison"
+)
+
+plt.xticks(rotation=20)
+
+plt.tight_layout()
+
+plt.show()
+
+
+# =========================================================
+# 10. CUSTOMER DEMAND PATTERN
+# =========================================================
+
+plt.figure(figsize=(12, 5))
+
+plt.plot(
+    data["Day"],
+    data["Customer_Demand"],
+    label="Actual Demand"
+)
+
+plt.plot(
+    data["Day"],
+    data["Expected_Demand"],
+    label="Expected Demand"
+)
+
+plt.xlabel("Day")
+
+plt.ylabel("Demand")
+
+plt.title(
+    "Simulated Customer Demand Pattern"
+)
+
+plt.legend()
+
+plt.tight_layout()
+
+plt.show()
+
+
+# =========================================================
+# 11. SAVE RESULTS
+# =========================================================
+
+results_df.to_csv(
+    "inventory_policy_results.csv",
+    index=False
+)
+
+print(
+    "\nResults saved as inventory_policy_results.csv"
+)
+
+
+# =========================================================
+# 12. DOWNLOAD RESULTS
+# =========================================================
+
+files.download(
+    "inventory_policy_results.csv"
+)
