@@ -1,0 +1,292 @@
+#A dynamic pricing platform aims to optimize its pricing strategy using model-based RL.
+Develop a predictive model that forecasts customer demand and price sensitivities based on
+historical sales data. Use Python to train the predictive model and implement a modelbased
+policy optimization algorithm to dynamically adjust prices in response to changing market
+conditions.
+
+
+
+# ============================================================
+# DYNAMIC PRICING USING MODEL-BASED RL
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from google.colab import files
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+# ------------------------------------------------------------
+# 1. UPLOAD DATASET
+# ------------------------------------------------------------
+
+print("Upload dynamic_pricing_small.csv")
+
+uploaded = files.upload()
+
+file_name = list(uploaded.keys())[0]
+
+df = pd.read_csv(file_name)
+
+print("\nDataset loaded successfully!")
+print(df.head())
+
+print("\nDataset Shape:", df.shape)
+
+
+# ------------------------------------------------------------
+# 2. SELECT FEATURES
+# ------------------------------------------------------------
+
+features = [
+    "price",
+    "competitor_price",
+    "promotion",
+    "holiday",
+    "temperature",
+    "marketing_spend"
+]
+
+X = df[features]
+y = df["demand"]
+
+
+# ------------------------------------------------------------
+# 3. TRAIN-TEST SPLIT
+# ------------------------------------------------------------
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.20,
+    random_state=42
+)
+
+
+# ------------------------------------------------------------
+# 4. TRAIN DEMAND PREDICTION MODEL
+# ------------------------------------------------------------
+
+model = RandomForestRegressor(
+    n_estimators=100,
+    random_state=42
+)
+
+model.fit(X_train, y_train)
+
+
+# ------------------------------------------------------------
+# 5. PREDICT DEMAND
+# ------------------------------------------------------------
+
+y_pred = model.predict(X_test)
+
+
+# ------------------------------------------------------------
+# 6. MODEL EVALUATION
+# ------------------------------------------------------------
+
+mae = mean_absolute_error(y_test, y_pred)
+
+rmse = np.sqrt(
+    mean_squared_error(y_test, y_pred)
+)
+
+r2 = r2_score(y_test, y_pred)
+
+print("\n========== MODEL PERFORMANCE ==========")
+
+print("MAE  :", round(mae, 2))
+print("RMSE :", round(rmse, 2))
+print("R2 Score :", round(r2, 4))
+
+
+# ------------------------------------------------------------
+# 7. DEMAND PREDICTION FUNCTION
+# ------------------------------------------------------------
+
+def predict_demand(
+    price,
+    competitor_price,
+    promotion,
+    holiday,
+    temperature,
+    marketing_spend
+):
+
+    new_data = pd.DataFrame([{
+
+        "price": price,
+
+        "competitor_price": competitor_price,
+
+        "promotion": promotion,
+
+        "holiday": holiday,
+
+        "temperature": temperature,
+
+        "marketing_spend": marketing_spend
+
+    }])
+
+    demand = model.predict(new_data)[0]
+
+    return max(0, demand)
+
+
+# ------------------------------------------------------------
+# 8. MODEL-BASED POLICY OPTIMIZATION
+# ------------------------------------------------------------
+
+def optimize_price(
+    competitor_price,
+    promotion,
+    holiday,
+    temperature,
+    marketing_spend
+):
+
+    # Possible prices
+    possible_prices = np.arange(50, 151, 5)
+
+    best_price = 0
+    best_revenue = -999999
+    best_demand = 0
+
+    for price in possible_prices:
+
+        demand = predict_demand(
+            price,
+            competitor_price,
+            promotion,
+            holiday,
+            temperature,
+            marketing_spend
+        )
+
+        # Reward = Revenue
+        revenue = price * demand
+
+        if revenue > best_revenue:
+
+            best_revenue = revenue
+            best_price = price
+            best_demand = demand
+
+    return best_price, best_demand, best_revenue
+
+
+# ------------------------------------------------------------
+# 9. CURRENT MARKET CONDITION
+# ------------------------------------------------------------
+
+row = df.iloc[0]
+
+optimal_price, predicted_demand, expected_revenue = optimize_price(
+
+    row["competitor_price"],
+    row["promotion"],
+    row["holiday"],
+    row["temperature"],
+    row["marketing_spend"]
+)
+
+
+# ------------------------------------------------------------
+# 10. DISPLAY OPTIMAL PRICE
+# ------------------------------------------------------------
+
+print("\n========== DYNAMIC PRICING RESULT ==========")
+
+print("Current Price       :", row["price"])
+
+print("Competitor Price    :", row["competitor_price"])
+
+print("Optimal Price       :", optimal_price)
+
+print("Predicted Demand    :", round(predicted_demand, 2))
+
+print("Expected Revenue    :", round(expected_revenue, 2))
+
+
+# ------------------------------------------------------------
+# 11. TEST DIFFERENT PRICES
+# ------------------------------------------------------------
+
+prices = np.arange(50, 151, 5)
+
+demands = []
+revenues = []
+
+for price in prices:
+
+    demand = predict_demand(
+        price,
+        row["competitor_price"],
+        row["promotion"],
+        row["holiday"],
+        row["temperature"],
+        row["marketing_spend"]
+    )
+
+    revenue = price * demand
+
+    demands.append(demand)
+
+    revenues.append(revenue)
+
+
+# ------------------------------------------------------------
+# 12. PRICE VS DEMAND
+# ------------------------------------------------------------
+
+plt.figure(figsize=(8,5))
+
+plt.plot(
+    prices,
+    demands,
+    marker="o"
+)
+
+plt.xlabel("Price")
+plt.ylabel("Predicted Demand")
+
+plt.title("Price vs Predicted Demand")
+
+plt.grid()
+
+plt.show()
+
+
+# ------------------------------------------------------------
+# 13. PRICE VS REVENUE
+# ------------------------------------------------------------
+
+plt.figure(figsize=(8,5))
+
+plt.plot(
+    prices,
+    revenues,
+    marker="o"
+)
+
+plt.axvline(
+    optimal_price,
+    linestyle="--",
+    label="Optimal Price"
+)
+
+plt.xlabel("Price")
+plt.ylabel("Expected Revenue")
+
+plt.title("Price vs Expected Revenue")
+
+plt.legend()
+
+plt.grid()
+
+plt.show()
