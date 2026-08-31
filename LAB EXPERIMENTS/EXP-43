@@ -1,0 +1,69 @@
+#Apply reinforcement learning techniques to optimize the management of natural resources
+(e.g., water, energy, forests) or sustainable infrastructure systems (e.g., smart grids,
+transportation networks). Develop a simulation environment that models resource
+dynamics, environmental constraints, and policy interventions, and use reinforcement
+learning algorithms to learn policies that balance resource utilization, economic efficiency,
+and environmental sustainability. Write a Python program to simulate the resource
+management processes and evaluate the learned policies.
+
+
+import random
+
+random.seed(10)
+
+states = ["Low", "Medium", "High"]
+actions = ["Reduce", "Normal", "Increase"]
+
+Q = {(s, a): 0 for s in states for a in actions}
+
+# Training
+for episode in range(100):
+    for state in states:
+
+        action = random.choice(actions)
+
+        if state == "Low":
+            reward = 10 if action == "Reduce" else -5
+        elif state == "Medium":
+            reward = 10 if action == "Normal" else 5
+        else:
+            reward = 10 if action == "Increase" else 5
+
+        Q[(state, action)] += 0.1 * (
+            reward - Q[(state, action)]
+        )
+
+# Evaluate learned policy
+print("Sustainable Resource Management\n")
+
+total_reward = 0
+
+for state in states:
+
+    action = max(
+        actions,
+        key=lambda a: Q[(state, a)]
+    )
+
+    if state == "Low":
+        reward = 10 if action == "Reduce" else -5
+    elif state == "Medium":
+        reward = 10 if action == "Normal" else 5
+    else:
+        reward = 10 if action == "Increase" else 5
+
+    total_reward += reward
+
+    print(
+        "Resource:", state,
+        "| Action:", action,
+        "| Reward:", reward
+    )
+
+print("\nFinal Evaluation")
+print("Total Reward:", total_reward)
+
+if total_reward >= 25:
+    print("Sustainability: GOOD")
+else:
+    print("Sustainability: NEEDS IMPROVEMENT")
