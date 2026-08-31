@@ -1,0 +1,73 @@
+#Apply reinforcement learning techniques to optimize healthcare management processes,
+such as patient scheduling, resource allocation, or treatment planning. Develop a simulation
+environment that models patient flow, resource constraints, and treatment outcomes, and
+use reinforcement learning algorithms to learn policies that maximize patient outcomes
+while minimizing costs or resource utilization. Write a Python program to simulate the
+healthcare management processes and evaluate the learned policies.
+
+
+
+
+import random
+
+random.seed(10)
+
+states = ["Low", "Medium", "High"]
+actions = ["Normal", "Priority"]
+
+Q = {(s, a): 0 for s in states for a in actions}
+
+# Training
+for episode in range(100):
+    for state in states:
+
+        if state == "High":
+            action = "Priority"
+        else:
+            action = random.choice(actions)
+
+        if action == "Priority":
+            reward = 10
+            cost = 3
+        else:
+            reward = 6
+            cost = 1
+
+        Q[(state, action)] += 0.1 * (
+            reward - cost - Q[(state, action)]
+        )
+
+# Evaluate policy
+print("Healthcare Management using Q-Learning\n")
+
+total_reward = 0
+total_cost = 0
+
+for state in states:
+
+    action = max(
+        actions,
+        key=lambda a: Q[(state, a)]
+    )
+
+    if action == "Priority":
+        reward = 10
+        cost = 3
+    else:
+        reward = 6
+        cost = 1
+
+    total_reward += reward
+    total_cost += cost
+
+    print(
+        "Patient:", state,
+        "| Action:", action,
+        "| Reward:", reward,
+        "| Cost:", cost
+    )
+
+print("\nFinal Evaluation")
+print("Total Reward:", total_reward)
+print("Total Cost:", total_cost)
+print("Overall Performance:", total_reward - total_cost)
