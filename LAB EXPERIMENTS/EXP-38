@@ -1,0 +1,41 @@
+#An adaptive control system aims to adapt its control policy to different operating conditions
+and environmental changes without explicit retraining. Implement a metalearning approach
+to enable the control system to learn how to adapt its parameters and structure based on
+past experiences and performance feedback. Write a Python program to simulate the
+control system&#39;s adaptation process and evaluate its performance under various conditions.
+
+
+import numpy as np
+
+# Operating conditions
+conditions = [1, 2, 3, 4, 5]
+
+# Initial control parameter
+control = 0.5
+
+print("Meta-Learning Adaptive Control\n")
+
+for condition in conditions:
+
+    target = condition * 10
+
+    # System output
+    output = control * target
+
+    # Performance error
+    error = abs(target - output)
+
+    # Adapt control using past feedback
+    control = control + 0.1 * (error / target)
+
+    # Limit control parameter
+    control = min(control, 1.0)
+
+    print("Condition:", condition)
+    print("Target:", target)
+    print("Output:", round(output, 2))
+    print("Error:", round(error, 2))
+    print("Adapted Control:", round(control, 2))
+    print("-" * 30)
+
+print("Adaptation completed successfully.")
