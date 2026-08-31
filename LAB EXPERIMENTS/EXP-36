@@ -1,0 +1,63 @@
+#A logistics company aims to optimize its supply chain operations using model-based RL.
+Develop a data generation model that simulates order fulfillment processes, inventory flows,
+and transportation networks. Use Python to generate synthetic data and evaluate different
+supply chain management policies based on the simulated environment.
+
+
+import pandas as pd
+from google.colab import files
+import io
+
+# Upload CSV dataset
+uploaded = files.upload()
+
+if not uploaded:
+  print("No dataset selected.")
+  exit()
+
+# Assuming only one file is uploaded, get its name
+file_name = next(iter(uploaded))
+data = pd.read_csv(io.BytesIO(uploaded[file_name]))
+
+print("\nDataset uploaded successfully!")
+print(data.head())
+
+# Supply chain policies
+policies = {
+    "Low Stock": 30,
+    "Medium Stock": 50,
+    "High Stock": 70
+}
+
+results = []
+
+for policy, stock in policies.items():
+    fulfilled = 0
+    cost = 0
+
+    for _, row in data.iterrows():
+        inventory = row["Inventory"] + stock
+        demand = row["Demand"]
+
+        if inventory >= demand:
+            fulfilled += 1
+
+        # Corrected column name: 'Transportation_Cost' instead of 'Transport_Cost'
+        cost += row["Transportation_Cost"] + abs(inventory - demand) * 2
+
+    results.append([
+        policy,
+        fulfilled,
+        round(cost / len(data), 2)
+    ])
+
+result = pd.DataFrame(
+    results,
+    columns=["Policy", "Orders_Fulfilled", "Average_Cost"]
+)
+
+print("\nPolicy Evaluation:")
+print(result)
+
+result.to_csv("policy_results.csv", index=False)
+print("\nResults saved to policy_results.csv")
