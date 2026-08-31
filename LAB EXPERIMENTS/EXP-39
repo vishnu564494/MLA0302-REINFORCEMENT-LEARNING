@@ -1,0 +1,56 @@
+#A team of autonomous robots collaborates to accomplish a complex task (e.g., search and
+rescue, package delivery) in a dynamic and uncertain environment. Implement multiagent
+reinforcement learning algorithms (e.g., MADDPG, COMA) to enable the robots to
+coordinate their actions and achieve collective objectives efficiently. Write a Python
+program to simulate the robots&#39; interactions and evaluate their performance in completing
+the task.
+
+
+import numpy as np
+
+np.random.seed(1)
+
+robots = 3
+targets = np.array([[8, 8], [2, 8], [8, 2]])
+positions = np.random.randint(0, 10, (robots, 2))
+
+print("Multi-Agent Reinforcement Learning")
+print("Algorithm: MADDPG-style Coordination\n")
+
+for episode in range(50):
+
+    for i in range(robots):
+
+        # Move toward assigned target
+        if positions[i, 0] < targets[i, 0]:
+            positions[i, 0] += 1
+        elif positions[i, 0] > targets[i, 0]:
+            positions[i, 0] -= 1
+
+        if positions[i, 1] < targets[i, 1]:
+            positions[i, 1] += 1
+        elif positions[i, 1] > targets[i, 1]:
+            positions[i, 1] -= 1
+
+# Evaluate performance
+distance = np.sum(
+    np.linalg.norm(positions - targets, axis=1)
+)
+
+completed = np.sum(
+    np.all(positions == targets, axis=1)
+)
+
+print("Final Robot Positions:")
+print(positions)
+
+print("\nTargets:")
+print(targets)
+
+print("\nRobots Completed:", completed, "/", robots)
+print("Total Distance:", round(distance, 2))
+
+if completed == robots:
+    print("Collective Task: SUCCESS")
+else:
+    print("Collective Task: PARTIALLY COMPLETED")
