@@ -1,0 +1,56 @@
+#An autonomous robot navigates through a partially observable environment with limited
+sensor information and uncertainty. Implement a partially observable Markov decision
+process (POMDP) framework to enable the robot to localize itself and plan navigation
+actions robustly under partial observability. Write a Python program to simulate the robot&#39;s
+navigation process and evaluate its performance in different scenarios.
+
+
+import random
+
+# Grid environment
+size = 5
+robot = [0, 0]
+goal = [4, 4]
+
+print("POMDP Robot Navigation\n")
+
+for step in range(20):
+
+    # Partial observation with sensor uncertainty
+    observation = [
+        robot[0] + random.choice([-1, 0, 1]),
+        robot[1] + random.choice([-1, 0, 1])
+    ]
+
+    # Keep observation inside grid
+    observation = [
+        max(0, min(size - 1, observation[0])),
+        max(0, min(size - 1, observation[1]))
+    ]
+
+    # Navigation action
+    if robot[0] < goal[0]:
+        robot[0] += 1
+        action = "DOWN"
+    elif robot[1] < goal[1]:
+        robot[1] += 1
+        action = "RIGHT"
+    else:
+        action = "STOP"
+
+    print("Step:", step + 1)
+    print("Observation:", observation)
+    print("Action:", action)
+    print("Robot Position:", robot)
+    print()
+
+    if robot == goal:
+        print("Goal reached!")
+        break
+
+print("Final Position:", robot)
+
+if robot == goal:
+    print("Navigation: SUCCESS")
+else:
+    print("Navigation: FAILED")
