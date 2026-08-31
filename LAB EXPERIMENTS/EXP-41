@@ -1,0 +1,59 @@
+#An autonomous system is designed to make decisions that may have ethical implications
+(e.g., autonomous vehicles, medical diagnosis systems). Implement ethical considerations
+into the system&#39;s decision-making process using reinforcement learning techniques, such as
+incorporating fairness constraints or avoiding harm to humans. Write a Python program to
+simulate the system&#39;s decision-making and evaluate its ethical performance.
+
+
+
+import random
+
+random.seed(10)
+
+actions = ["SAFE", "RISKY"]
+
+reward = 0
+harm = 0
+fair = 0
+
+print("Ethical Reinforcement Learning\n")
+
+for step in range(20):
+
+    # Choose safe action more often
+    if random.random() < 0.8:
+        action = "SAFE"
+    else:
+        action = "RISKY"
+
+    if action == "SAFE":
+        r = 10
+        h = 0
+    else:
+        r = 15
+        h = 5
+
+    # Ethical constraint: avoid harmful action
+    if h > 0:
+        r -= 20
+        harm += h
+    else:
+        fair += 1
+
+    reward += r
+
+    print(
+        "Step:", step + 1,
+        "Action:", action,
+        "Reward:", r
+    )
+
+print("\nFinal Evaluation")
+print("Total Reward:", reward)
+print("Total Harm:", harm)
+print("Safe Decisions:", fair, "/ 20")
+
+if harm <= 10:
+    print("Ethical Performance: GOOD")
+else:
+    print("Ethical Performance: NEEDS IMPROVEMENT")
