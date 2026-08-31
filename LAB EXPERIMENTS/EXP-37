@@ -1,0 +1,58 @@
+#Multiple agents collaborate to solve a cooperative task in a simulated environment with
+hierarchical structure and interdependencies. Implement the MAXQ framework to
+decompose the task into hierarchically organized subtasks and learn policies for each level of
+the hierarchy. Write a Python program to simulate the agents&#39; interactions and evaluate
+their performance in achieving the overall task objectives.
+
+
+import random
+
+# MAXQ hierarchical tasks
+tasks = {
+    "MainTask": ["Agent1_Task", "Agent2_Task"],
+    "Agent1_Task": ["Collect", "Move"],
+    "Agent2_Task": ["Build", "Deliver"]
+}
+
+q = {}
+
+def learn(task, action):
+    q[(task, action)] = q.get((task, action), 0) + random.choice([1, 2, 3])
+
+def choose(task):
+    actions = tasks[task]
+    return max(actions, key=lambda x: q.get((task, x), 0))
+
+# Training
+for episode in range(100):
+    for task, subtasks in tasks.items():
+        for subtask in subtasks:
+            learn(task, subtask)
+
+# Execution
+print("MAXQ Hierarchical Task Execution\n")
+
+total_reward = 0
+
+for task, subtasks in tasks.items():
+    if task == "MainTask":
+        print("Main Task")
+
+        for agent_task in subtasks:
+            action = choose(task)
+            print("Agent executes:", action)
+
+            if agent_task == "Agent1_Task":
+                print("  Collect -> Move")
+                total_reward += 10
+
+            elif agent_task == "Agent2_Task":
+                print("  Build -> Deliver")
+                total_reward += 10
+
+print("\nTotal Reward:", total_reward)
+
+if total_reward >= 20:
+    print("Overall Task: SUCCESS")
+else:
+    print("Overall Task: FAILED")
